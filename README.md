@@ -5,7 +5,6 @@
 **ShadowScope — модульный CLI-инструмент на Python для авторизованной разведки и анализа поверхности атаки.** Объединяет внешние инструменты, сохраняет результаты в SQLite и формирует отчёты для сравнения запусков.
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.12-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](https://www.linux.org/)
 
 </div>
