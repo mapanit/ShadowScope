@@ -4,20 +4,44 @@
 !.env.example
 /config.json
 
-# Python environments and caches
+# Python environments, caches, and build artifacts
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
 
-# Generated runtime data
+# Generated runtime data and scan results
 /logs/
 /reports/output/
-/data/*.db
-/data/*.db-*
-/data/*.sqlite
-/data/*.sqlite-*
+/scan_*.log
+*.log
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
 
-.github
+# Local IDE and operating-system files
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+!.github/
+!.github/workflows/
+!.github/workflows/ci.yml

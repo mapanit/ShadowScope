@@ -22,6 +22,15 @@ TOOLS = {
         ("whatweb", "Системный пакет / Gem", "sudo apt install whatweb"),
         ("gf", "github.com/tomnomnom/gf@latest", "go install -v github.com/tomnomnom/gf@latest"),
     ],
+    "TLS & Screenshots": [
+        ("tlsx", "github.com/projectdiscovery/tlsx/cmd/tlsx@latest", "go install -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest"),
+        ("testssl.sh", "https://github.com/testssl/testssl.sh", "Установите testssl.sh из официального репозитория"),
+        ("gowitness", "github.com/sensepost/gowitness@latest", "go install -v github.com/sensepost/gowitness@latest"),
+    ],
+    "Local service inventory": [
+        ("openssl", "OpenSSL CLI", "sudo apt install openssl"),
+        ("ssh-keyscan", "OpenSSH client", "sudo apt install openssh-client"),
+    ],
     "Vulnerability & Fuzzing": [
         ("nuclei", "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest", "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"),
         ("ffuf", "github.com/ffuf/ffuf/v2@latest", "go install -v github.com/ffuf/ffuf/v2@latest"),

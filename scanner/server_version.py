@@ -65,7 +65,7 @@ class WappalyzerScanner:
         # 2) Свои сигнатуры из заголовков
         try:
             r = requests.get(
-                url, timeout=self.config.get_timeout, verify=False,
+                url, timeout=self.config.get_timeout,
                 allow_redirects=False, headers=self.config.get_http_headers,
             )
             result["headers"] = dict(r.headers)

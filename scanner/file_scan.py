@@ -1,10 +1,14 @@
 import math
+import re
 import shutil
 import subprocess
 
 # Стандартный путь к словарю в Kali/большинстве security-дистрибутивов
 # (пакет dirb ставит его сюда по умолчанию).
 DEFAULT_WORDLIST = "/usr/share/wordlists/dirb/common.txt"
+WILDCARD_LENGTH_PATTERN = re.compile(
+    r"non existing urls.*?\(Length:\s*(\d+)\)", re.IGNORECASE | re.DOTALL
+)
 
 
 class FileScanner:
@@ -48,6 +52,48 @@ class FileScanner:
                 command,
                 capture_output=True, text=True, timeout=timeout,
             )
+            if result.returncode:
+                diagnostic = "\n".join(
+                    part for part in (result.stderr, result.stdout) if part
+                )
+                wildcard_match = WILDCARD_LENGTH_PATTERN.search(diagnostic)
+                if wildcard_match:
+                    excluded_length = wildcard_match.group(1)
+                    retry_command = [
+                        *command, "--exclude-length", excluded_length
+                    ]
+                    result = subprocess.run(
+                        retry_command,
+                        capture_output=True, text=True, timeout=timeout,
+                    )
+                    if result.returncode:
+                        diagnostic = "\n".join(
+                            part for part in (result.stderr, result.stdout)
+                            if part
+                        )
+                        return {
+                            "error": (
+                                "Gobuster завершился с кодом "
+                                f"{result.returncode} после исключения "
+                                f"wildcard-ответа длиной {excluded_length}"
+                                + (f": {diagnostic.strip()}" if diagnostic.strip() else "")
+                            )
+                        }
+                    return {
+                        "found_files": [
+                            line for line in result.stdout.splitlines()
+                            if line.strip()
+                        ],
+                        "excluded_wildcard_length": int(excluded_length),
+                    }
+            if result.returncode:
+                error = result.stderr.strip() or result.stdout.strip()
+                return {
+                    "error": (
+                        f"Gobuster завершился с кодом {result.returncode}"
+                        + (f": {error}" if error else "")
+                    )
+                }
             return {"found_files": [line for line in result.stdout.splitlines() if line.strip()]}
         except subprocess.TimeoutExpired:
             return {"error": f"Gobuster: превышен таймаут сканирования ({timeout} сек.)"}
@@ -76,6 +122,14 @@ class FileScanner:
                 command,
                 capture_output=True, text=True, timeout=timeout,
             )
+            if result.returncode:
+                error = result.stderr.strip() or result.stdout.strip()
+                return {
+                    "error": (
+                        f"Dirb завершился с кодом {result.returncode}"
+                        + (f": {error}" if error else "")
+                    )
+                }
             found = [line for line in result.stdout.splitlines() if line.strip().startswith("+")]
             return {"found_files": found}
         except subprocess.TimeoutExpired:

@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import pytest
 
@@ -9,6 +10,13 @@ from core.storage import Storage
 from modules.recon.httpx_probe import HttpxProbe
 from modules.vuln.nuclei_scan import NucleiScanner
 from reports.summary import finding_summary
+from scanner.api_docs import ApiDocsScanner
+from scanner.extra_tools import (
+    GowitnessScanner,
+    TestSSLScanner as TLSConfigScanner,
+    TLSXScanner,
+)
+from scanner.file_scan import FileScanner
 
 
 def test_config_exposes_only_bug_bounty_marker_and_migrates_legacy_user_agent(tmp_path):
@@ -136,3 +144,163 @@ def test_nuclei_receives_bug_bounty_header(monkeypatch):
     assert captured["command"][header_index + 1] == (
         "X-Bug-Bounty: ShadowScope/2.0"
     )
+
+
+def test_api_docs_extracts_openapi_metadata(tmp_path, monkeypatch):
+    document = {
+        "openapi": "3.0.0",
+        "info": {"title": "Juice Shop API", "version": "1.0"},
+        "paths": {"/api/items": {}, "/api/users": {}},
+    }
+
+    class Response:
+        status_code = 200
+        headers = {"Content-Type": "application/json"}
+
+        @staticmethod
+        def json():
+            return document
+
+    monkeypatch.setattr("scanner.api_docs.requests.get", lambda *a, **k: Response())
+    result = ApiDocsScanner(scope=ScopePolicy("127.0.0.1:3000")).scan(
+        "http://127.0.0.1:3000"
+    )
+
+    assert result["specs"][0]["title"] == "Juice Shop API"
+    assert result["specs"][0]["path_count"] == 2
+    assert result["errors"] == []
+
+
+def test_api_docs_does_not_fetch_external_swagger_spec(monkeypatch):
+    requested_urls = []
+
+    class Response:
+        def __init__(self, status_code, headers=None, text=""):
+            self.status_code = status_code
+            self.headers = headers or {}
+            self.text = text
+
+        def json(self):
+            raise ValueError("not JSON")
+
+    def fake_get(url, **_kwargs):
+        requested_urls.append(url)
+        if url.endswith("/api-docs"):
+            return Response(301, {"Location": "/api-docs/"})
+        if url.endswith("/api-docs/"):
+            return Response(
+                200,
+                {"Content-Type": "text/html"},
+                '<div id="swagger-ui"></div>',
+            )
+        if url.endswith("/swagger-initializer.js"):
+            return Response(
+                200,
+                {"Content-Type": "application/javascript"},
+                'url: "https://petstore.swagger.io/v2/swagger.json"',
+            )
+        return Response(404)
+
+    monkeypatch.setattr("scanner.api_docs.requests.get", fake_get)
+    result = ApiDocsScanner(scope=ScopePolicy("127.0.0.1:3000")).scan(
+        "http://127.0.0.1:3000"
+    )
+
+    assert "http://127.0.0.1:3000/api-docs/" in result["docs_pages"]
+    assert result["external_references_not_fetched"] == [
+        "https://petstore.swagger.io/v2/swagger.json"
+    ]
+    assert all("petstore.swagger.io" not in url for url in requested_urls)
+
+
+def test_optional_tool_scanners_restrict_target_to_scope(monkeypatch, tmp_path):
+    scope = ScopePolicy("127.0.0.1:3000")
+    captured = []
+
+    def fake_run_tool(command, **kwargs):
+        captured.append(command)
+        if command[0] == "tlsx":
+            return '{"host":"127.0.0.1","port":"3000"}\n', ""
+        if command[0] == "testssl.sh":
+            return "doesn't seem to be a TLS/SSL enabled server", ""
+        return "", ""
+
+    monkeypatch.setattr("scanner.extra_tools.run_tool", fake_run_tool)
+    monkeypatch.setattr(
+        "scanner.extra_tools.report_directory",
+        lambda _target, _name: tmp_path,
+    )
+
+    assert TLSXScanner(scope).scan("http://127.0.0.1:3000")["records"]
+    assert TLSConfigScanner(scope).scan(
+        "http://127.0.0.1:3000"
+    )["status"] == "not-tls"
+    screenshot = GowitnessScanner(scope).scan("http://127.0.0.1:3000")
+    assert screenshot["target"] == "http://127.0.0.1:3000"
+    assert all(
+        any("127.0.0.1" in part for part in command)
+        for command in captured
+    )
+
+    with pytest.raises(ValueError, match="вне разрешённой области"):
+        TLSXScanner(scope).scan("https://127.0.0.2:3000")
+
+
+def test_file_scan_surfaces_gobuster_wildcard_errors(monkeypatch, tmp_path):
+    wordlist = tmp_path / "common.txt"
+    wordlist.write_text("admin\n", encoding="utf-8")
+    monkeypatch.setattr(
+        FileScanner, "_tool_available", staticmethod(lambda _name: True)
+    )
+    monkeypatch.setattr(
+        "scanner.file_scan.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            1,
+            "",
+            "Error: server returns status code 200 for non existing urls",
+        ),
+    )
+
+    result = FileScanner().scan_with_gobuster(
+        "http://127.0.0.1:3000", str(wordlist)
+    )
+
+    assert "error" in result
+    assert "non existing urls" in result["error"]
+
+
+def test_file_scan_retries_gobuster_with_detected_wildcard_length(
+    monkeypatch, tmp_path
+):
+    wordlist = tmp_path / "common.txt"
+    wordlist.write_text("admin\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(
+        FileScanner, "_tool_available", staticmethod(lambda _name: True)
+    )
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        if len(calls) == 1:
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                "",
+                "Error: non existing urls return 200 (Length: 9984)",
+            )
+        return subprocess.CompletedProcess(
+            command, 0, "/admin (Status: 200)\n", ""
+        )
+
+    monkeypatch.setattr("scanner.file_scan.subprocess.run", fake_run)
+    result = FileScanner().scan_with_gobuster(
+        "http://127.0.0.1:3000", str(wordlist)
+    )
+
+    assert len(calls) == 2
+    assert calls[1][-2:] == ["--exclude-length", "9984"]
+    assert result == {
+        "found_files": ["/admin (Status: 200)"],
+        "excluded_wildcard_length": 9984,
+    }

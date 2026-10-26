@@ -133,12 +133,24 @@ python main.py --file_scan authorized-target.example.test
 # Сканирование шаблонами Nuclei
 python main.py --nuclei authorized-target.example.test
 
+# Проверка TLS-сертификата / конфигурации TLS
+python main.py --tlsx https://authorized-target.example.test
+python main.py --testssl https://authorized-target.example.test
+
+# Скриншот и поиск API-документации того же origin
+python main.py --gowitness https://authorized-target.example.test
+python main.py --api-docs https://authorized-target.example.test
+
 # Добавить домен в scope только при наличии явного разрешения на него
 python main.py --full authorized-target.example.test \
   --allow-scope another-authorized-target.example.test
 ```
 
 Замените примерную цель на ресурс, разрешённый правилами программы. По умолчанию scope включает точную цель и её поддомены; дополнительные корни передаются через `--allow-scope`. IP-адреса ограничиваются точным IP. HTTP-переходы за пределы scope не выполняются там, где их можно контролировать.
+
+`--file_scan` по умолчанию использует `/usr/share/wordlists/dirb/common.txt`. Если сервер возвращает одинаковую страницу для несуществующих путей (часто у SPA), Gobuster прекращает сканирование. Размер такой страницы можно проверить случайным путём и передать Gobuster через `--exclude-length <размер>`; ShadowScope выводит ошибку Gobuster вместо пустого успешного результата.
+
+Дополнительные одиночные режимы `--tlsx`, `--testssl`, `--gowitness` и `--api-docs` не входят в `--full`: запускайте их отдельно и только в разрешённом scope. Для них нужны внешние программы `tlsx`, `testssl.sh`, `gowitness` и Chrome/Chromium для снимков экрана. Проверка API-документации не загружает спецификацию, если Swagger UI ссылается на другой origin.
 
 ### История и сравнение
 ```bash
@@ -169,7 +181,7 @@ ShadowScope/
 │   ├── recon/             # dnsx, httpx, wayback, crawl
 │   ├── analysis/          # whatweb, gf-фильтр
 │   └── vuln/              # nuclei, ffuf, takeover
-├── scanner/               # Локальные сканеры (nmap, whois, traffic)
+├── scanner/               # Сканеры (nmap, API docs, TLS, screenshots)
 ├── reports/               # Генераторы отчётов (Markdown, HTML, JSON)
 ├── utils/                 # Утилиты (асинхронный менеджер, shell, healthcheck)
 ├── tests/                 # Автоматические unit-тесты
@@ -203,7 +215,15 @@ python -m pytest -q
 python -m compileall -q main.py menu.py config.py core modules reports scanner utils tests
 ```
 
-GitHub Actions выполняет тесты и проверку компиляции при `push` и `pull_request` на Python 3.10 и 3.12. Тесты используют временную SQLite-базу и моки; реальные сетевые сканы не запускаются.
+Дополнительные проверки безопасности самого проекта:
+```bash
+pip-audit -r requirements-dev.txt
+bandit -ll -r main.py menu.py config.py core modules reports scanner utils
+```
+
+Bandit запускается с порогом Medium: низкоуровневые предупреждения о штатном вызове внешних CLI-инструментов не считаются ошибкой CI.
+
+GitHub Actions выполняет тесты и проверку компиляции при `push` и `pull_request` на Python 3.10 и 3.12, а также проверяет зависимости и Python-код с помощью `pip-audit` и Bandit. Тесты используют временную SQLite-базу и моки; реальные сетевые сканы не запускаются.
 
 ---
 

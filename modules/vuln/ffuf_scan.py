@@ -8,10 +8,10 @@ from pathlib import Path
 
 from utils.shell import run_tool, ToolNotInstalled, ToolTimeout
 
-DEFAULT_WORDLIST = "/usr/share/wordlists/dirb/common.txt"
+DEFAULT_WORDLIST = "~/usr/share/wordlists/dirb/common.txt"
 ALT_WORDLISTS = [
-    "/usr/share/seclists/Discovery/Web-Content/common.txt",
-    "/usr/share/wordlists/dirbuster/directory-list-2.3-small.txt",
+    "~/usr/share/seclists/Discovery/Web-Content/common.txt",
+    "~/usr/share/wordlists/dirbuster/directory-list-2.3-small.txt",
 ]
 
 

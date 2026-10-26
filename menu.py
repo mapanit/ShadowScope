@@ -434,6 +434,10 @@ def scan_menu(cfg: Config):
         "6":  ("nuclei",          "Nuclei"),
         "7":  ("capture",         "Захват трафика (pyshark)"),
         "8":  ("full_pipeline",   "🎯 ПОЛНЫЙ ПРОГОН (recon → vuln → отчёты)"),
+        "9":  ("tlsx",            "Сведения о TLS-сертификате (tlsx)"),
+        "10": ("testssl",         "Проверка TLS-конфигурации (testssl.sh)"),
+        "11": ("gowitness",       "Скриншот веб-страницы (gowitness)"),
+        "12": ("api_docs",        "Поиск OpenAPI/Swagger документации"),
     }
     print("\nРежимы (через запятую, например 1,2,6):")
     for k, (_, desc) in options.items():

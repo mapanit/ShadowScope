@@ -40,7 +40,11 @@ class HTTPScanner:
     def check_http(self, target):
         headers = self.config.get_http_headers
         try:
-            urlopen(Request(f"http://{target}", headers=headers), timeout=self.config.get_timeout)
+            # The URL is restricted to HTTP, so non-web schemes cannot be opened.
+            urlopen(  # nosec B310
+                Request(f"http://{target}", headers=headers),
+                timeout=self.config.get_timeout,
+            )
             return {"status": "OK", "message": "Сервер отвечает на HTTP-запросы"}
         except HTTPError as e:
             # БАГ в исходнике: код ответа искали строкой через "403" in str(e),

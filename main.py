@@ -15,6 +15,8 @@ from scanner.subdomain_scanner import SubdomainScanner
 from scanner.server_version import ServerVersionScanner, WappalyzerScanner
 from scanner.file_scan import FileScanner
 from scanner.network_traffic import NetworkTrafficScanner, TrafficCaptureScanner
+from scanner.api_docs import ApiDocsScanner
+from scanner.extra_tools import GowitnessScanner, TestSSLScanner, TLSXScanner
 
 # новый nuclei (единый)
 from modules.vuln.nuclei_scan import NucleiScanner
@@ -40,6 +42,10 @@ class ShadowScope:
         "file_scan":       "file_scan",
         "network_traffic": "network_traffic_scan",
         "nuclei":          "nuclei_scan",
+        "tlsx":            "tlsx_scan",
+        "testssl":         "testssl_scan",
+        "gowitness":       "gowitness_scan",
+        "api_docs":        "api_docs_scan",
     }
 
     def __init__(self, config: Config = None, logger: Logger = None,
@@ -199,6 +205,40 @@ class ShadowScope:
         self.logger.log("Nuclei", result)
         return result
 
+    async def tlsx_scan(self, target):
+        result = await self.manager.run_task(
+            TLSXScanner(self.scope).scan, target
+        )
+        self.logger.log("tlsx", result)
+        return result
+
+    async def testssl_scan(self, target):
+        result = await self.manager.run_task(
+            TestSSLScanner(self.scope).scan, target
+        )
+        self.logger.log("testssl.sh", result)
+        return result
+
+    async def gowitness_scan(self, target):
+        result = await self.manager.run_task(
+            GowitnessScanner(self.scope, self.config.get_http_headers).scan,
+            target,
+        )
+        self.logger.log("gowitness", result)
+        return result
+
+    async def api_docs_scan(self, target):
+        result = await self.manager.run_task(
+            ApiDocsScanner(
+                timeout=self.config.get_timeout,
+                headers=self.config.get_http_headers,
+                scope=self.scope,
+            ).scan,
+            target,
+        )
+        self.logger.log("API documentation discovery", result)
+        return result
+
     async def live_capture(self, interface, duration, count):
         print(f"📡 Захват трафика на {interface} ({duration}s)")
         result = await self.manager.run_task(
@@ -257,6 +297,11 @@ async def cli_main():
     parser.add_argument("--file_scan",       action="store_true", help="gobuster + dirb")
     parser.add_argument("--network_traffic", action="store_true", help="nmap http-enum")
     parser.add_argument("--nuclei",          action="store_true", help="nuclei")
+    parser.add_argument("--tlsx", action="store_true", help="TLS certificate inspection with tlsx")
+    parser.add_argument("--testssl", action="store_true", help="TLS configuration checks with testssl.sh")
+    parser.add_argument("--gowitness", action="store_true", help="Screenshot the target with gowitness")
+    parser.add_argument("--api-docs", dest="api_docs", action="store_true",
+                        help="Discover same-origin OpenAPI/Swagger documentation")
     parser.add_argument("--capture",         action="store_true", help="захват трафика (pyshark)")
     parser.add_argument("--full",            action="store_true",
                         help="ПОЛНЫЙ прогон: recon → analysis → vuln → отчёты")
